@@ -1,9 +1,10 @@
 import asyncio
-import datetime
 
 from config.config import load_config
 from database.database import Database
-from database.data_aggregator import get_aggregated_data, TimeSpan
+from aiogram import Bot, Dispatcher
+
+from handlers.standard_handlers import router
 
 
 async def main():
@@ -18,6 +19,16 @@ async def main():
         config.database.db_name,
         config.database.collection_name,
     )
+
+    dp = Dispatcher(db_collection=db_collection)
+    bot = Bot(token=config.telegram_bot.token)
+
+    dp.include_router(router)
+
+    print('Launching bot')
+
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 
 if __name__ == '__main__':

@@ -19,6 +19,7 @@ class Database:
     async def connect_to_database(cls, uri: str) -> bool:
         try:
             cls._client = AsyncIOMotorClient(uri)
+            await cls._client.admin.command('ping')
             return True
         except ConfigurationError:
             print('Incorrect uri')
