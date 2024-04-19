@@ -11,6 +11,8 @@ async def main():
     """"""
     config = load_config()
 
+    print('Connecting to DB')
+
     if not await Database.connect_to_database(config.database.connection_uri):
         print('Unable to connect to database')
         return

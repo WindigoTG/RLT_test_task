@@ -17,6 +17,8 @@ class Database:
 
     @classmethod
     async def connect_to_database(cls, uri: str) -> bool:
+        """ Подключение к удалённой базе данных. """
+
         try:
             cls._client = AsyncIOMotorClient(uri)
             await cls._client.admin.command('ping')
@@ -33,6 +35,7 @@ class Database:
 
     @classmethod
     def get_database(cls, db_name: str) -> Optional[AsyncIOMotorDatabase]:
+        """ Получение желаемой базы данных для работы. """
         if cls._client:
             return cls._client[db_name]
 
@@ -41,5 +44,6 @@ class Database:
         cls, db_name: str,
         collection_name: str,
     ) -> Optional[AsyncIOMotorCollection]:
+        """ Получение желаемой коллекции для работы. """
         if cls._client:
             return cls._client[db_name][collection_name]

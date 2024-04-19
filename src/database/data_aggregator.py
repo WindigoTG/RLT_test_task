@@ -1,40 +1,36 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
-from enum import Enum
 from typing import Dict, List, Optional
 
 import pymongo
 from motor.motor_asyncio import AsyncIOMotorCollection
 
-
-class TimeSpan(Enum):
-    Hour = "hour"
-    Day = "day"
-    Month = "month"
+from utils.enums import GroupType
 
 
-FORMAT_BY_TIME_SPAN = {
-    TimeSpan.Hour: "%Y-%m-%dT%H:00:00",
-    TimeSpan.Day: "%Y-%m-%dT00:00:00",
-    TimeSpan.Month: "%Y-%m-01T00:00:00",
+FORMAT_BY_GROUP_TYPE = {
+    GroupType.Hour: "%Y-%m-%dT%H:00:00",
+    GroupType.Day: "%Y-%m-%dT00:00:00",
+    GroupType.Month: "%Y-%m-01T00:00:00",
 }
 
-STEP_BY_TIME_SPAN = {
-    TimeSpan.Hour: relativedelta(hours=1),
-    TimeSpan.Day: relativedelta(days=1),
-    TimeSpan.Month: relativedelta(months=1)
+STEP_BY_GROUP_TYPE = {
+    GroupType.Hour: relativedelta(hours=1),
+    GroupType.Day: relativedelta(days=1),
+    GroupType.Month: relativedelta(months=1)
 }
 
 
 def _get_iso_dates_list(
     date_from: datetime,
     date_to: datetime,
-    time_span: TimeSpan,
+    time_span: GroupType,
 ) -> List[str]:
+    """ Получить список iso дат, входящих в желаемый диапазон. """
     new_date = date_from
     dates = []
-    step = STEP_BY_TIME_SPAN[time_span]
+    step = STEP_BY_GROUP_TYPE[time_span]
 
     while new_date <= date_to:
         dates.append(new_date)
@@ -47,10 +43,11 @@ async def get_aggregated_data(
     collection: AsyncIOMotorCollection,
     date_from: datetime,
     date_to: datetime,
-    time_span: TimeSpan
+    time_span: GroupType
 ) -> Optional[Dict]:
+    """ Получение агрегированных данных. """
 
-    date_format = FORMAT_BY_TIME_SPAN[time_span]
+    date_format = FORMAT_BY_GROUP_TYPE[time_span]
 
     stage_match = {
         "$match": {
