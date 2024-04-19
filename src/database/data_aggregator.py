@@ -1,6 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from dateutil.relativedelta import relativedelta
 from enum import Enum
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import pymongo
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -17,6 +19,28 @@ FORMAT_BY_TIME_SPAN = {
     TimeSpan.Day: "%Y-%m-%dT00:00:00",
     TimeSpan.Month: "%Y-%m-01T00:00:00",
 }
+
+STEP_BY_TIME_SPAN = {
+    TimeSpan.Hour: relativedelta(hours=1),
+    TimeSpan.Day: relativedelta(days=1),
+    TimeSpan.Month: relativedelta(months=1)
+}
+
+
+def _get_iso_dates_list(
+    date_from: datetime,
+    date_to: datetime,
+    time_span: TimeSpan,
+) -> List[str]:
+    new_date = date_from
+    dates = []
+    step = STEP_BY_TIME_SPAN[time_span]
+
+    while new_date <= date_to:
+        dates.append(new_date)
+        new_date += step
+
+    return [date.isoformat() for date in dates]
 
 
 async def get_aggregated_data(
@@ -52,11 +76,68 @@ async def get_aggregated_data(
         }
     }
 
+    stage_project_first = {
+        "$project": {
+            "_id": False,
+            "date": '$_id',
+            "sum": True,
+        }
+    }
+
+    stage_group_test = {
+        "$group": {
+            "_id": None,
+            "points": {"$push": "$$ROOT"}
+        }
+    }
+
+    dates = _get_iso_dates_list(date_from, date_to, time_span)
+
+    stage_project_second = {
+        "$project":{
+            "points": {
+                "$map": {
+                    "input": dates,
+                    "as": "date",
+                    "in": {
+                        "$let": {
+                            "vars": {
+                                "dateIndex": {
+                                    "$indexOfArray": ["$points.date", "$$date"]
+                                }
+                            },
+                            "in": {
+                                "$cond": {
+                                    "if": {"$ne": ["$$dateIndex", -1]},
+                                    "then": {
+                                        "$arrayElemAt": [
+                                            "$points",
+                                            "$$dateIndex",
+                                        ]
+                                    },
+                                    "else": {"sum": 0, "date": "$$date"}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    stage_unwind = {
+        "$unwind": "$points"
+    }
+
+    stage_replace_root = {
+        "$replaceRoot": {"newRoot": "$points"}
+    }
+
     stage_group_second = {
         "$group": {
           "_id": None,
           "dataset": {"$push": "$sum"},
-          "labels": {"$push": "$_id"},
+          "labels": {"$push": "$date"},
         }
     }
 
@@ -69,6 +150,11 @@ async def get_aggregated_data(
             stage_match,
             stage_group_first,
             stage_sort,
+            stage_project_first,
+            stage_group_test,
+            stage_project_second,
+            stage_unwind,
+            stage_replace_root,
             stage_group_second,
             stage_project,
         ]
